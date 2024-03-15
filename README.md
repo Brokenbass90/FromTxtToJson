@@ -3,7 +3,7 @@ This utility is needed to process "txt" files into "json" files.
 Example: 
 From txt.
 {{text one}}
-{{text @@@two@@@}}}
+{{text @@two@@}}}
 {{text three}}
 
 into json
