@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to JSON Converter</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .custom-file-upload {
+            background-color: #ffa07a; /* Light Salmon */
+            color: #333;
+            font-size: 16px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        .custom-file-upload:hover {
+            background-color: #ff7f50; /* Coral */
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        #file_chosen {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <label for="file_input" class="custom-file-upload">Choose Folder</label>
+        <div id="file_chosen">No folder chosen</div>
+        <input type="file" id="file_input" webkitdirectory directory multiple />
+        <button id="process_files" class="custom-file-upload">Convert</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.2/FileSaver.min.js"></script>
+    <script>
+        document.getElementById('file_input').addEventListener('change', function() {
+            var folderName = this.files.length > 0 ? this.files[0].webkitRelativePath.split('/')[0] : "No folder chosen";
+            document.getElementById('file_chosen').textContent = folderName;
+        });
+
+        document.getElementById('process_files').addEventListener('click', function() {
+            const outputName = document.getElementById('file_chosen').textContent.replace(/-out$/, '') + '-out';
+            processFiles(outputName);
+        });
+
+        function processFiles(outputName) {
+            const inputElement = document.getElementById('file_input');
+            const files = inputElement.files;
+            if (files.length === 0) return;
+
+            const zip = new JSZip();
+
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = e.target.result;
+
+                    if ((content.match(/\{\{/g) || []).length !== (content.match(/\}\}/g) || []).length) {
+                        alert(`Error in the file ${file.name}: missing sign { or }`);
+                        return;
+                    }
+
+                    if ((content.match(/@@/g) || []).length % 2 !== 0) {
+                        alert(`Error in the file ${file.name}: missing sign @`);
+                        return;
+                    }
+
+                    const blocks = content.match(/\{\{(.+?)\}\}/g).reduce((acc, block, index) => {
+                        const key = `block_${String(index).padStart(2, '0')}`;
+                        let value = block.replace(/\{\{|\}\}/g, '').trim();
+                        value = value.replace(/@@(.*?)@@/g, '<b>$1</b>'); 
+                        acc[key] = value;
+                        return acc;
+                    }, {});
+
+                    const localeMatch = file.name.match(/_(\w{2})_\w{2}_/);
+                    const locale = localeMatch ? localeMatch[1] : 'unknown';
+                    const jsonContent = JSON.stringify(blocks, null, 4);
+
+                    zip.folder(`${outputName}/${locale}`).file(`${outputName}.json`, jsonContent);
+                };
+                reader.readAsText(file);
+            });
+
+            setTimeout(() => {
+                zip.generateAsync({type:"blob"})
+                .then(function(content) {
+                    saveAs(content, `${outputName}.zip`);
+                });
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
